@@ -82,13 +82,14 @@ EIP-7732/
 
 ## Prerequisites
 
-- **Rust** ≥ 1.78 (stable)  
+- **Rust** ≥ 1.78 (stable recommended; repo currently built with 1.87)  
   Install: https://rustup.rs
-- **Cargo** (included with Rust)
-- Optional: `cargo-fuzz` for fuzzing targets
+- **Cargo-fuzz** + **nightly toolchain** (only if you run fuzz targets)
 
 ```bash
 rustup update stable
+rustup toolchain install nightly        # required for make fuzz
+cargo install cargo-fuzz                # required for make fuzz
 ```
 
 ---
@@ -96,67 +97,40 @@ rustup update stable
 ## Getting Started
 
 ### Build
-
 ```bash
 git clone https://github.com/EIPs-CodeLab/EIP-7732
 cd EIP-7732
-make build
+make build            # release build
+# or: cargo build      # debug build
 ```
 
-### Run tests
-
+### Test matrix
 ```bash
-make test
+make test             # all tests
+make test-unit        # unit tests only
+make test-integration # integration tests only
 ```
 
-### Run benchmarks
-
+### Lint / format
 ```bash
-make bench
+make fmt              # rustfmt
+make fmt-check        # rustfmt --check
+make lint             # cargo clippy --all-targets --all-features -D warnings
 ```
 
-### CLI — simulate an ePBS slot lifecycle
-
+### Fuzz (requires nightly + cargo-fuzz)
 ```bash
-# Simulate 64 slots with 10% builder withholding rate
-make sim
-
-# Or directly:
-cargo run --release --bin epbs-cli -- sim --slots 64 --withhold-rate 0.1
+make fuzz             # runs fuzz_bid and fuzz_envelope
 ```
 
-Example output:
-```
-=== EIP-7732 ePBS simulation — 64 slots ===
-
-  Slot    1: FULL     (bid=1000000000 Gwei)
-  Slot    2: FULL     (bid=1000000000 Gwei)
-  ...
-  Slot    7: EMPTY    (builder withheld payload)
-  ...
-  Slot   20: SKIPPED  (no beacon block)
-  ...
-
-=== Summary ===
-  Full    : 57
-  Empty   : 6
-  Skipped : 1
-  Builder balance remaining: 43000000000 Gwei
-  Queued withdrawals: 57
-```
-
-### CLI — craft a bid
-
+### Examples & CLI
 ```bash
-cargo run --release --bin epbs-cli -- bid \
-  --builder-index 0 \
-  --slot 100 \
-  --value 1000000000
-```
+make cli              # prints epbs-cli --help
+make sim-builder      # single-slot builder simulation
+make sim-ptc          # PTC voting scenarios
 
-### CLI — verify a bid JSON
-
-```bash
+# direct CLI usage
+cargo run --release --bin epbs-cli -- bid --slot 100 --builder-index 0 --value 1000000000
 cargo run --release --bin epbs-cli -- verify --bid /path/to/bid.json
 ```
 
