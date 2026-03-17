@@ -13,11 +13,13 @@
 ///
 /// Reference: https://eips.ethereum.org/EIPS/eip-7732#honest-builder-guide
 use crate::beacon_chain::{
+    constants::DOMAIN_BEACON_BUILDER,
     containers::{
         ExecutionPayload, ExecutionPayloadEnvelope, SignedExecutionPayloadEnvelope, Withdrawal,
     },
     types::{BuilderIndex, Hash32, Root, Slot},
 };
+use crate::utils::ssz;
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -81,15 +83,11 @@ pub fn construct_envelope(
         state_root: params.post_state_root,
     };
 
-    let signing_root = compute_envelope_signing_root(&message);
+    let domain = ssz::compute_domain_simple(DOMAIN_BEACON_BUILDER);
+    let signing_root = ssz::signing_root(&message, domain);
     let signature = sign_fn(&signing_root).map_err(EnvelopeError::SigningFailed)?;
 
     Ok(SignedExecutionPayloadEnvelope { message, signature })
-}
-
-fn compute_envelope_signing_root(_msg: &ExecutionPayloadEnvelope) -> Vec<u8> {
-    // TODO: ssz hash_tree_root(msg) XOR compute_domain(DOMAIN_BEACON_BUILDER, ...)
-    vec![0u8; 32]
 }
 
 #[cfg(test)]
