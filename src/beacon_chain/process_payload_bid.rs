@@ -7,9 +7,11 @@
 ///
 /// Reference: https://eips.ethereum.org/EIPS/eip-7732#beacon-chain-changes
 use crate::beacon_chain::{
+    constants::DOMAIN_BEACON_BUILDER,
     containers::{BuilderPendingPayment, BuilderPendingWithdrawal, SignedExecutionPayloadBid},
-    types::{BuilderIndex, Gwei, Slot},
+    types::{BLSPubkey, BuilderIndex, Gwei, Slot},
 };
+use crate::utils::{crypto, ssz};
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -28,11 +30,15 @@ pub enum PayloadBidError {
 
     #[error("Parent block hash mismatch")]
     ParentHashMismatch,
+
+    #[error("Builder pubkey missing for index {0}")]
+    MissingPubkey(BuilderIndex),
 }
 
 /// Minimal beacon state surface needed by this function.
 pub trait BeaconStateMut {
     fn builder_balance(&self, index: BuilderIndex) -> Option<Gwei>;
+    fn builder_pubkey(&self, index: BuilderIndex) -> Option<BLSPubkey>;
     fn deduct_builder_balance(&mut self, index: BuilderIndex, amount: Gwei);
     fn push_pending_payment(&mut self, payment: BuilderPendingPayment);
     fn current_slot(&self) -> Slot;
@@ -68,10 +74,7 @@ pub fn process_execution_payload_bid<S: BeaconStateMut>(
         return Err(PayloadBidError::ParentHashMismatch);
     }
 
-    // Step 3 — BLS signature (stub — wire to blst crate in full impl)
-    verify_builder_signature(signed_bid)?;
-
-    // Step 4 + 5 — balance check and deduction
+    // Step 3 — balance check
     let balance = state
         .builder_balance(bid.builder_index)
         .ok_or(PayloadBidError::BuilderNotFound(bid.builder_index))?;
@@ -83,6 +86,10 @@ pub fn process_execution_payload_bid<S: BeaconStateMut>(
         });
     }
 
+    // Step 4 — BLS signature
+    verify_builder_signature(state, signed_bid)?;
+
+    // Step 5 — deduct balance
     state.deduct_builder_balance(bid.builder_index, bid.value);
 
     // Step 6 — queue pending payment
@@ -100,9 +107,17 @@ pub fn process_execution_payload_bid<S: BeaconStateMut>(
 }
 
 /// Stub — replace with blst domain-separated BLS verify in full impl.
-fn verify_builder_signature(
-    _signed_bid: &SignedExecutionPayloadBid,
+fn verify_builder_signature<S: BeaconStateMut>(
+    state: &S,
+    signed_bid: &SignedExecutionPayloadBid,
 ) -> Result<(), PayloadBidError> {
-    // TODO: compute signing_root with DOMAIN_BEACON_BUILDER and verify
-    Ok(())
+    let message = &signed_bid.message;
+    let pk = state
+        .builder_pubkey(message.builder_index)
+        .ok_or(PayloadBidError::MissingPubkey(message.builder_index))?;
+
+    let domain = ssz::compute_domain_simple(DOMAIN_BEACON_BUILDER);
+    let signing_root = ssz::signing_root(message, domain);
+    crypto::bls_verify(&pk, &signing_root, &signed_bid.signature)
+        .map_err(|_| PayloadBidError::InvalidSignature)
 }

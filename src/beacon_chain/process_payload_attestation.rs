@@ -5,10 +5,11 @@
 ///
 /// Reference: https://eips.ethereum.org/EIPS/eip-7732#beacon-chain-changes
 use crate::beacon_chain::{
-    constants::PTC_SIZE,
+    constants::{DOMAIN_PTC_ATTESTER, PTC_SIZE},
     containers::{PayloadAttestation, PayloadAttestationData},
-    types::{Slot, ValidatorIndex},
+    types::{BLSPubkey, Slot, ValidatorIndex},
 };
+use crate::utils::{crypto, ssz};
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -24,11 +25,15 @@ pub enum PayloadAttestationError {
 
     #[error("Attesting index {0} is not a PTC member for this slot")]
     NotPtcMember(ValidatorIndex),
+
+    #[error("PTC pubkey list length does not match committee size")]
+    MissingPubkeys,
 }
 
 pub trait BeaconStateRead {
     fn parent_slot(&self) -> Slot;
     fn get_ptc(&self, slot: Slot) -> Vec<ValidatorIndex>;
+    fn ptc_pubkeys(&self, slot: Slot) -> Vec<BLSPubkey>;
     fn parent_beacon_block_root(&self) -> [u8; 32];
 }
 
@@ -66,28 +71,40 @@ pub fn process_payload_attestation<S: BeaconStateRead>(
 
     // Get the PTC members for the attested slot
     let ptc = state.get_ptc(data.slot);
+    let ptc_pubkeys = state.ptc_pubkeys(data.slot);
+    if ptc_pubkeys.len() != ptc.len() {
+        return Err(PayloadAttestationError::MissingPubkeys);
+    }
 
-    // Collect attesting validators
-    let attesting: Vec<ValidatorIndex> = attestation
-        .aggregation_bits
-        .iter()
-        .enumerate()
-        .filter(|(_, &bit)| bit)
-        .map(|(i, _)| ptc[i])
-        .collect();
+    // Collect attesting validators and their pubkeys
+    let mut attesting_indices = Vec::new();
+    let mut attesting_pubkeys = Vec::new();
+    for (i, bit) in attestation.aggregation_bits.iter().enumerate() {
+        if *bit {
+            attesting_indices.push(ptc[i]);
+            attesting_pubkeys.push(ptc_pubkeys[i]);
+        }
+    }
 
-    // Verify aggregated signature (stub)
-    verify_aggregate_ptc_signature(&attestation.signature, data, &attesting)?;
+    // Verify aggregated signature
+    verify_aggregate_ptc_signature(
+        &attestation.signature,
+        data,
+        &attesting_indices,
+        &attesting_pubkeys,
+    )?;
 
     Ok(())
 }
 
 fn verify_aggregate_ptc_signature(
-    _signature: &[u8; 96],
-    _data: &PayloadAttestationData,
+    signature: &[u8; 96],
+    data: &PayloadAttestationData,
     _validators: &[ValidatorIndex],
+    pubkeys: &[BLSPubkey],
 ) -> Result<(), PayloadAttestationError> {
-    // TODO: aggregate public keys, compute signing_root with DOMAIN_PTC_ATTESTER,
-    //       verify with blst
-    Ok(())
+    let domain = ssz::compute_domain_simple(DOMAIN_PTC_ATTESTER);
+    let signing_root = ssz::signing_root(data, domain);
+    crypto::bls_verify_aggregate(pubkeys, &signing_root, signature)
+        .map_err(|_| PayloadAttestationError::InvalidSignature)
 }

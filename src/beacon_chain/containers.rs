@@ -1,7 +1,7 @@
-use crate::beacon_chain::constants::MAX_PAYLOAD_ATTESTATIONS;
 /// EIP-7732 — SSZ containers
 /// All containers directly mirror the spec definitions.
 /// Reference: https://eips.ethereum.org/EIPS/eip-7732#containers
+use crate::beacon_chain::constants::MAX_PAYLOAD_ATTESTATIONS;
 use crate::beacon_chain::types::*;
 use serde::{Deserialize, Serialize};
 
