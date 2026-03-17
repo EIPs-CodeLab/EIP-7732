@@ -21,7 +21,6 @@ path = "examples/ptc_sim/main.rs"
 
 [dependencies]
 ssz_types   = "0.6"
-tree_hash   = "0.6"
 blst        = "0.3"
 sha2        = "0.10"
 hex         = "0.4"
