@@ -3,6 +3,7 @@
 /// Tests the complete slot lifecycle end-to-end:
 /// bid → beacon block → envelope → PTC → fork choice
 
+use blst::min_pk::SecretKey;
 use eip_7732::{
     beacon_chain::{
         containers::ExecutionPayload,
@@ -15,15 +16,23 @@ use eip_7732::{
         guide::HonestBuilder,
     },
     fork_choice::{handlers as fc, store::{EpbsStore, SlotPayloadStatus}},
+    utils::crypto,
 };
 
-fn dummy_signer(_: &[u8]) -> Result<[u8; 96], String> { Ok([0u8; 96]) }
+fn test_secret_key() -> SecretKey {
+    SecretKey::from_bytes(&[9u8; 32]).expect(\"valid sk\")
+}
+
+fn bls_signer(msg: &[u8]) -> Result<[u8; 96], String> {
+    Ok(crypto::bls_sign(&test_secret_key(), msg))
+}
 
 struct SimpleState {
     balance:      u64,
     payments:     Vec<eip_7732::beacon_chain::containers::BuilderPendingPayment>,
     slot:         u64,
     latest_hash:  [u8; 32],
+    pubkey:       BLSPubkey,
 }
 
 impl BeaconStateMut for SimpleState {
@@ -34,6 +43,7 @@ impl BeaconStateMut for SimpleState {
     }
     fn current_slot(&self) -> u64 { self.slot }
     fn latest_block_hash(&self) -> [u8; 32] { self.latest_hash }
+    fn builder_pubkey(&self, _: u64) -> Option<BLSPubkey> { Some(self.pubkey) }
 }
 
 #[test]
@@ -60,7 +70,7 @@ fn full_slot_happy_path() {
             execution_payment:    0,
             blob_kzg_commitments: vec![],
         },
-        dummy_signer,
+        bls_signer,
     ).unwrap();
 
     // 2. Beacon state processes bid
@@ -69,6 +79,7 @@ fn full_slot_happy_path() {
         payments:    vec![],
         slot,
         latest_hash: parent_hash,
+        pubkey: test_secret_key().sk_to_pk().to_bytes(),
     };
     process_execution_payload_bid(&mut state, &bid).unwrap();
     assert_eq!(state.payments.len(), 1);
@@ -104,7 +115,7 @@ fn full_slot_happy_path() {
             committed_hash,
             expected_withdrawals: vec![],
         },
-        dummy_signer,
+        bls_signer,
     ).unwrap();
 
     // 5. Fork choice records payload
