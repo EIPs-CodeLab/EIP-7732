@@ -11,11 +11,13 @@
 ///
 /// Reference: https://eips.ethereum.org/EIPS/eip-7732#honest-builder-guide
 use crate::beacon_chain::{
+    constants::DOMAIN_BEACON_BUILDER,
     containers::{ExecutionPayloadBid, SignedExecutionPayloadBid},
     types::{
         BLSSignature, BuilderIndex, ExecutionAddress, Gwei, Hash32, KZGCommitment, Root, Slot,
     },
 };
+use crate::utils::ssz;
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -88,18 +90,12 @@ pub fn construct_bid(
         blob_kzg_commitments: params.blob_kzg_commitments.clone(),
     };
 
-    // Compute signing root: hash_tree_root(message) XOR domain
-    let signing_root = compute_signing_root(&message);
+    let domain = ssz::compute_domain_simple(DOMAIN_BEACON_BUILDER);
+    let signing_root = ssz::signing_root(&message, domain);
 
     let signature = sign_fn(&signing_root).map_err(BidError::SigningFailed)?;
 
     Ok(SignedExecutionPayloadBid { message, signature })
-}
-
-/// Stub signing root — replace with proper SSZ hash_tree_root + domain mix.
-fn compute_signing_root(_message: &ExecutionPayloadBid) -> Vec<u8> {
-    // TODO: ssz hash_tree_root(message) XOR compute_domain(DOMAIN_BEACON_BUILDER, ...)
-    vec![0u8; 32]
 }
 
 #[cfg(test)]

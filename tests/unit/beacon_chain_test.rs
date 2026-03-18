@@ -1,5 +1,6 @@
 /// Unit tests — beacon chain state transition functions
 
+use blst::min_pk::{AggregateSignature, SecretKey};
 use eip_7732::beacon_chain::{
     constants::*,
     containers::*,
@@ -8,27 +9,35 @@ use eip_7732::beacon_chain::{
     types::*,
     withdrawals::{process_withdrawals_consensus, verify_payload_withdrawals, WithdrawalError, WithdrawalState},
 };
+use eip_7732::utils::{crypto, ssz};
 
 // ── Mock beacon state ──────────────────────────────────────────────────────────
 
 struct MockState {
     builders:           std::collections::HashMap<BuilderIndex, Gwei>,
+    builder_pubkeys:    std::collections::HashMap<BuilderIndex, BLSPubkey>,
     pending_payments:   Vec<BuilderPendingPayment>,
     slot:               Slot,
     latest_block_hash:  Hash32,
     expected_withdrawals: Vec<Withdrawal>,
+    ptc_pubkeys:       Vec<BLSPubkey>,
 }
 
 impl MockState {
     fn new(slot: Slot) -> Self {
         let mut builders = std::collections::HashMap::new();
         builders.insert(1u64, 32_000_000_000u64);
+        let mut builder_pubkeys = std::collections::HashMap::new();
+        builder_pubkeys.insert(1u64, test_pubkey());
+        let ptc_pubkeys = vec![test_pubkey(); PTC_SIZE as usize];
         Self {
             builders,
+            builder_pubkeys,
             pending_payments:    vec![],
             slot,
             latest_block_hash:  [0x01u8; 32],
             expected_withdrawals: vec![],
+            ptc_pubkeys,
         }
     }
 }
@@ -36,6 +45,9 @@ impl MockState {
 impl BeaconStateMut for MockState {
     fn builder_balance(&self, index: BuilderIndex) -> Option<Gwei> {
         self.builders.get(&index).copied()
+    }
+    fn builder_pubkey(&self, index: BuilderIndex) -> Option<BLSPubkey> {
+        self.builder_pubkeys.get(&index).copied()
     }
     fn deduct_builder_balance(&mut self, index: BuilderIndex, amount: Gwei) {
         if let Some(bal) = self.builders.get_mut(&index) {
@@ -54,6 +66,9 @@ impl BeaconStateRead for MockState {
     fn get_ptc(&self, _slot: Slot) -> Vec<ValidatorIndex> {
         (0..PTC_SIZE as u64).collect()
     }
+    fn ptc_pubkeys(&self, _slot: Slot) -> Vec<BLSPubkey> {
+        self.ptc_pubkeys.clone()
+    }
     fn parent_beacon_block_root(&self) -> [u8; 32] { [0xBBu8; 32] }
 }
 
@@ -70,21 +85,24 @@ impl WithdrawalState for MockState {
 }
 
 fn make_valid_bid(slot: Slot) -> SignedExecutionPayloadBid {
+    let message = ExecutionPayloadBid {
+        parent_block_hash:    [0x01u8; 32],
+        parent_block_root:    [0x02u8; 32],
+        block_hash:           [0xAAu8; 32],
+        prev_randao:          [0u8; 32],
+        fee_recipient:        [0xFEu8; 20],
+        gas_limit:            30_000_000,
+        builder_index:        1,
+        slot,
+        value:                1_000_000_000,
+        execution_payment:    0,
+        blob_kzg_commitments: vec![],
+    };
+    let domain = ssz::compute_domain_simple(DOMAIN_BEACON_BUILDER);
+    let signing_root = ssz::signing_root(&message, domain);
     SignedExecutionPayloadBid {
-        message: ExecutionPayloadBid {
-            parent_block_hash:    [0x01u8; 32],
-            parent_block_root:    [0x02u8; 32],
-            block_hash:           [0xAAu8; 32],
-            prev_randao:          [0u8; 32],
-            fee_recipient:        [0xFEu8; 20],
-            gas_limit:            30_000_000,
-            builder_index:        1,
-            slot,
-            value:                1_000_000_000,
-            execution_payment:    0,
-            blob_kzg_commitments: vec![],
-        },
-        signature: [0u8; 96],
+        message,
+        signature: crypto::bls_sign(&test_secret_key(), &signing_root),
     }
 }
 
@@ -188,15 +206,20 @@ fn withdrawal_cleared_after_valid_payload() {
 #[test]
 fn valid_ptc_attestation_accepted() {
     let state = MockState::new(100);
+    let aggregation_bits = vec![true; PTC_SIZE as usize];
+    let data = PayloadAttestationData {
+        beacon_block_root:   [0xBBu8; 32],
+        slot:                99, // parent slot
+        payload_present:     true,
+        blob_data_available: true,
+    };
+    let domain = ssz::compute_domain_simple(DOMAIN_PTC_ATTESTER);
+    let signing_root = ssz::signing_root(&data, domain);
+    let signature = aggregate_signature(&aggregation_bits, &signing_root);
     let att = PayloadAttestation {
-        aggregation_bits: vec![true; PTC_SIZE as usize],
-        data: PayloadAttestationData {
-            beacon_block_root:   [0xBBu8; 32],
-            slot:                99, // parent slot
-            payload_present:     true,
-            blob_data_available: true,
-        },
-        signature: [0u8; 96],
+        aggregation_bits,
+        data,
+        signature,
     };
     assert!(process_payload_attestation(&state, &att).is_ok());
 }
@@ -233,4 +256,24 @@ fn ptc_wrong_slot_rejected() {
     };
     let err = process_payload_attestation(&state, &att).unwrap_err();
     assert!(matches!(err, PayloadAttestationError::WrongSlot { .. }));
+}
+
+fn test_secret_key() -> SecretKey {
+    SecretKey::from_bytes(&[7u8; 32]).expect("valid secret key")
+}
+
+fn test_pubkey() -> BLSPubkey {
+    test_secret_key().sk_to_pk().to_bytes()
+}
+
+fn aggregate_signature(bits: &[bool], signing_root: &[u8]) -> BLSSignature {
+    let sk = test_secret_key();
+    let mut agg = AggregateSignature::new();
+    for bit in bits {
+        if *bit {
+            agg.add(&sk.sign(signing_root, crypto::ETH_DST, &[]))
+                .expect("aggregate add");
+        }
+    }
+    agg.to_signature().to_bytes()
 }

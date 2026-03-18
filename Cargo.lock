@@ -402,7 +402,6 @@ dependencies = [
  "thiserror",
  "tracing",
  "tracing-subscriber",
- "tree_hash",
 ]
 
 [[package]]
