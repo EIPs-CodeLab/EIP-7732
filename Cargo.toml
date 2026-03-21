@@ -6,6 +6,7 @@ description = "EIP-7732 — Enshrined Proposer-Builder Separation (ePBS) referen
 license = "Apache-2.0"
 repository = "https://github.com/EIPs-CodeLab/EIP-7732"
 keywords   = ["ethereum", "eip-7732", "epbs", "consensus", "builder"]
+# PR #1: BLS signing roots and verification wiring
 
 [[bin]]
 name = "epbs-cli"
