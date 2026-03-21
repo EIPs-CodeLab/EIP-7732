@@ -99,7 +99,7 @@ fn make_valid_bid(slot: Slot) -> SignedExecutionPayloadBid {
         blob_kzg_commitments: vec![],
     };
     let domain = ssz::compute_domain_simple(DOMAIN_BEACON_BUILDER);
-    let signing_root = ssz::signing_root(&message, domain);
+    let signing_root = ssz::signing_root_json(&message, domain);
     SignedExecutionPayloadBid {
         message,
         signature: crypto::bls_sign(&test_secret_key(), &signing_root),
@@ -214,7 +214,7 @@ fn valid_ptc_attestation_accepted() {
         blob_data_available: true,
     };
     let domain = ssz::compute_domain_simple(DOMAIN_PTC_ATTESTER);
-    let signing_root = ssz::signing_root(&data, domain);
+    let signing_root = ssz::signing_root_json(&data, domain);
     let signature = aggregate_signature(&aggregation_bits, &signing_root);
     let att = PayloadAttestation {
         aggregation_bits,

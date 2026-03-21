@@ -84,7 +84,7 @@ pub fn construct_envelope(
     };
 
     let domain = ssz::compute_domain_simple(DOMAIN_BEACON_BUILDER);
-    let signing_root = ssz::signing_root(&message, domain);
+    let signing_root = ssz::signing_root_json(&message, domain);
     let signature = sign_fn(&signing_root).map_err(EnvelopeError::SigningFailed)?;
 
     Ok(SignedExecutionPayloadEnvelope { message, signature })

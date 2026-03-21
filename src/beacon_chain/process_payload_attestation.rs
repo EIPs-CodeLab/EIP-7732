@@ -104,7 +104,7 @@ fn verify_aggregate_ptc_signature(
     pubkeys: &[BLSPubkey],
 ) -> Result<(), PayloadAttestationError> {
     let domain = ssz::compute_domain_simple(DOMAIN_PTC_ATTESTER);
-    let signing_root = ssz::signing_root(data, domain);
+    let signing_root = ssz::signing_root_json(data, domain);
     crypto::bls_verify_aggregate(pubkeys, &signing_root, signature)
         .map_err(|_| PayloadAttestationError::InvalidSignature)
 }
