@@ -1,0 +1,33 @@
+[package]
+name = "eip-7732-fuzz"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = { version = "0.4", features = ["arbitrary-derive"] }
+arbitrary = { version = "1", features = ["derive"] }
+serde_json = "1"
+eip-7732 = { path = ".." }
+
+[build-dependencies]
+cc = "1"
+
+[workspace]
+members = ["."]
+resolver = "2"
+
+[[bin]]
+name = "fuzz_bid"
+path = "fuzz_targets/fuzz_bid.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "fuzz_envelope"
+path = "fuzz_targets/fuzz_envelope.rs"
+test = false
+doc = false

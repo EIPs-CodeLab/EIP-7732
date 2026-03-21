@@ -1,4 +1,9 @@
 /target
+fuzz/target
+fuzz/artifacts
+fuzz/corpus
+fuzz/crashes
+fuzz/coverage
 .TODO
 
 .env

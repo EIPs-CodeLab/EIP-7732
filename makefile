@@ -1,4 +1,4 @@
-.PHONY: build test lint fmt check clean sim-builder sim-ptc cli docs
+.PHONY: build test lint fmt check clean sim-builder sim-ptc cli docs fuzz fuzz-bid fuzz-envelope
 
 # ─── Build ────────────────────────────────────────────────────────────────────
 build:
@@ -14,9 +14,13 @@ test-unit:
 test-integration:
 	cargo test --test integration
 
-fuzz:
-	cargo +nightly fuzz run fuzz_bid
-	cargo +nightly fuzz run fuzz_envelope
+fuzz: fuzz-bid fuzz-envelope
+
+fuzz-bid:
+	cd fuzz && cargo +nightly fuzz run fuzz_bid -- -max_total_time=30
+
+fuzz-envelope:
+	cd fuzz && cargo +nightly fuzz run fuzz_envelope -- -max_total_time=30
 
 # ─── Quality ──────────────────────────────────────────────────────────────────
 lint:
