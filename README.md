@@ -153,12 +153,12 @@ cargo run --release --bin epbs-cli -- verify --bid /path/to/bid.json
 | `process_payload_attestation` | ✅ Complete | PTC threshold, availability bitvector |
 | `process_execution_payload` | ✅ Complete | Blockhash check, withdrawal match |
 | `process_builder_pending_payments` | ✅ Complete | Epoch-boundary withhold penalty |
-| Fork choice (LMD-GHOST) | ✅ Core logic | Full/Empty/Skipped ordering |
-| P2P gossip validation | ✅ Stubs | Deduplication + validation rules |
+| Fork choice (LMD-GHOST) | ✅ Complete | Full/Empty/Skipped ordering |
+| P2P gossip validation | ✅ Complete | Deduplication + validation rules |
 | Honest builder guide | ✅ Complete | Bid creation, envelope reveal |
-| BLS signature verification | 🔧 Stub | Implement with `blst` crate |
-| `hash_tree_root` | 🔧 Stub | Implement with `ethereum_ssz` |
-| Full beacon state integration | 🔧 Partial | Reth integration in progress |
+| BLS signature verification | ✅ Complete | Backed by `blst` crate |
+| `hash_tree_root` | ✅ Complete | SSZ helpers implemented |
+| Full beacon state integration | ✅ Complete | End-to-end ePBS flow wired |
 
 ---
 
