@@ -199,7 +199,7 @@ The expected time for an attacker controlling 35% of stake to gain majority cont
 
 ## Technical Deep-Dive
 
-*For a detailed explanation of how ePBS works, the design decisions behind each component, and how this implementation maps to the spec, see [Medium]((https://medium.com/@zakariasaif/ethereum-just-fired-its-middleman-273993cee519).*
+*For a detailed explanation of how ePBS works, the design decisions behind each component, and how this implementation maps to the spec, see [Medium](https://medium.com/@zakariasaif/ethereum-just-fired-its-middleman-273993cee519).*
 
 ---
 
