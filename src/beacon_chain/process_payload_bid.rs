@@ -117,7 +117,7 @@ fn verify_builder_signature<S: BeaconStateMut>(
         .ok_or(PayloadBidError::MissingPubkey(message.builder_index))?;
 
     let domain = ssz::compute_domain_simple(DOMAIN_BEACON_BUILDER);
-    let signing_root = ssz::signing_root(message, domain);
+    let signing_root = ssz::signing_root_json(message, domain);
     crypto::bls_verify(&pk, &signing_root, &signed_bid.signature)
         .map_err(|_| PayloadBidError::InvalidSignature)
 }
