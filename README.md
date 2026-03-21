@@ -120,7 +120,15 @@ make lint             # cargo clippy --all-targets --all-features -D warnings
 
 ### Fuzz (requires nightly + cargo-fuzz)
 ```bash
-make fuzz             # runs fuzz_bid and fuzz_envelope
+make fuzz             # runs fuzz_bid and fuzz_envelope (~30s each)
+make fuzz-bid         # bid harness only (~30s)
+make fuzz-envelope    # envelope harness only (~30s)
+```
+Fuzz setup:
+```bash
+rustup toolchain install nightly
+cargo install cargo-fuzz
+cd fuzz && cargo +nightly fuzz run fuzz_bid
 ```
 
 ### Examples & CLI
